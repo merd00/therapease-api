@@ -8,26 +8,18 @@ from app.routers import appointments
 from app.routers import notes
 from app.routers import stats
 
-# Veritabanı tablolarını oluştur
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="TherapEase API", version="1.0.0")
 
-# CORS ayarları — React'in API'ye erişmesine izin ver
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],,
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# Router'ları bağla
+
 app.include_router(auth.router)
 app.include_router(patients.router)
 app.include_router(appointments.router)
