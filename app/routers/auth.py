@@ -6,6 +6,8 @@ from app.schemas import schemas
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -81,3 +83,22 @@ def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
         "user": user
     }
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> models.User:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Geçersiz token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Geçersiz token")
+
+    user = db.query(models.User).filter(models.User.id == int(user_id)).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail="Kullanıcı bulunamadı")
+
+    return user

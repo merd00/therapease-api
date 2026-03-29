@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
@@ -17,6 +17,9 @@ class UserResponse(BaseModel):
     name: str
     email: str
     role: str
+    title: Optional[str] = None
+    clinic_name: Optional[str] = None
+    avatar_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -25,6 +28,16 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     user: UserResponse
+
+# ── PROFİL ────────────────────────────────────────────────────────────────────
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    title: Optional[str] = None
+    clinic_name: Optional[str] = None
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 # ── HASTA ─────────────────────────────────────────────────────────────────────
 class PatientCreate(BaseModel):

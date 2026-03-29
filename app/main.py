@@ -7,6 +7,9 @@ from app.routers import patients
 from app.routers import appointments
 from app.routers import notes
 from app.routers import stats
+from app.routers import users          
+from fastapi.staticfiles import StaticFiles   
+import os  
 
 Base.metadata.create_all(bind=engine)
 
@@ -20,11 +23,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+os.makedirs("avatars", exist_ok=True)
+app.mount("/avatars", StaticFiles(directory="avatars"), name="avatars")
+
 app.include_router(auth.router)
 app.include_router(patients.router)
 app.include_router(appointments.router)
 app.include_router(notes.router)
 app.include_router(stats.router)
+app.include_router(users.router)
 
 @app.get("/")
 def root():
