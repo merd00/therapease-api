@@ -15,12 +15,16 @@ app = FastAPI(title="TherapEase API", version="1.0.0")
 # CORS ayarları — React'in API'ye erişmesine izin ver
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "https://therapease-web.vercel.app",
+        "https://therapease-egcsr0kzj-merd00s-projects.vercel.app",
+        "https://therapease-hqk48vqzf-merd00s-projects.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # Router'ları bağla
 app.include_router(auth.router)
 app.include_router(patients.router)
