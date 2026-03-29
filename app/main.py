@@ -6,6 +6,7 @@ from app.routers import auth
 from app.routers import patients
 from app.routers import appointments
 from app.routers import notes
+from app.routers import stats
 
 # Veritabanı tablolarını oluştur
 Base.metadata.create_all(bind=engine)
@@ -30,6 +31,7 @@ app.include_router(auth.router)
 app.include_router(patients.router)
 app.include_router(appointments.router)
 app.include_router(notes.router)
+app.include_router(stats.router)
 
 @app.get("/")
 def root():
