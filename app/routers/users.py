@@ -1,78 +1,95 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import datetime, date
 from app.database import get_db
-from app.models.models import User
-from app.schemas.schemas import UserResponse, UpdateProfileRequest, ChangePasswordRequest
-from app.routers.auth import get_current_user
-import shutil, os, uuid
+from app.models import models
+from app.schemas import schemas
+from app.routers.patients import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-# ── Mevcut kullanıcıyı getir ──────────────────────────────────────────────────
-@router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+
+@router.get("/me", response_model=schemas.UserResponse)
+def get_me(
+    current_user: models.User = Depends(get_current_user)
+):
     return current_user
 
-# ── Profil bilgilerini güncelle ───────────────────────────────────────────────
-@router.put("/me", response_model=UserResponse)
-def update_profile(
-    data: UpdateProfileRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    if data.name is not None:
-        current_user.name = data.name
-    if data.title is not None:
-        current_user.title = data.title
-    if data.clinic_name is not None:
-        current_user.clinic_name = data.clinic_name
 
+@router.put("/me", response_model=schemas.UserResponse)
+def update_me(
+    data: schemas.UpdateProfileRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(current_user, key, value)
     db.commit()
     db.refresh(current_user)
     return current_user
 
-# ── Şifre değiştir ───────────────────────────────────────────────────────────
-@router.put("/me/password")
-def change_password(
-    data: ChangePasswordRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+
+# ── YENİ: İstatistikler ──────────────────────────────────────────────────────
+@router.get("/stats")
+def get_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
-    from passlib.context import CryptContext
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    today     = date.today()
+    this_month_start = today.replace(day=1).isoformat()
 
-    if not pwd_context.verify(data.current_password, current_user.password):
-        raise HTTPException(status_code=400, detail="Mevcut şifre hatalı")
+    # Danışanlar
+    total_patients = db.query(models.Patient).filter(
+        models.Patient.doctor_id == current_user.id
+    ).count()
 
-    current_user.password = pwd_context.hash(data.new_password)
-    db.commit()
-    return {"message": "Şifre başarıyla güncellendi"}
+    # Tüm randevular
+    all_appts = db.query(models.Appointment).filter(
+        models.Appointment.doctor_id == current_user.id
+    ).all()
 
-# ── Avatar yükle ──────────────────────────────────────────────────────────────
-@router.post("/me/avatar", response_model=UserResponse)
-def upload_avatar(
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    # Sadece resim dosyası kabul et
-    if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:
-        raise HTTPException(status_code=400, detail="Sadece JPG, PNG veya WEBP yükleyebilirsiniz")
+    total_appts     = len(all_appts)
+    completed_appts = len([a for a in all_appts if a.status == "Onaylı"])
+    cancelled_appts = len([a for a in all_appts if a.status == "İptal"])
+    completion_rate = round(completed_appts / total_appts * 100) if total_appts > 0 else 0
 
-    # Klasör yoksa oluştur
-    os.makedirs("avatars", exist_ok=True)
+    # Bu ay randevular
+    this_month_appts     = [a for a in all_appts if a.date >= this_month_start]
+    this_month_completed = len([a for a in this_month_appts if a.status == "Onaylı"])
+    this_month_total     = len(this_month_appts)
 
-    # Benzersiz dosya adı oluştur
-    ext = file.filename.split(".")[-1]
-    filename = f"{uuid.uuid4()}.{ext}"
-    filepath = f"avatars/{filename}"
+    # Gelir hesabı
+    fee = current_user.session_fee or 0
+    total_income      = completed_appts * fee
+    this_month_income = this_month_completed * fee
 
-    # Dosyayı kaydet
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # En çok yapılan randevu türü
+    type_counts = {}
+    for a in all_appts:
+        type_counts[a.type] = type_counts.get(a.type, 0) + 1
+    most_common_type = max(type_counts, key=type_counts.get) if type_counts else None
 
-    # URL'yi veritabanına kaydet
-    current_user.avatar_url = f"/avatars/{filename}"
-    db.commit()
-    db.refresh(current_user)
-    return current_user
+    # Toplam not
+    total_notes = db.query(models.Note).filter(
+        models.Note.doctor_id == current_user.id
+    ).count()
+
+    return {
+        # Danışan
+        "total_patients":        total_patients,
+        # Randevu
+        "total_appointments":    total_appts,
+        "completed_appointments": completed_appts,
+        "cancelled_appointments": cancelled_appts,
+        "completion_rate":       completion_rate,
+        "most_common_type":      most_common_type,
+        # Bu ay
+        "this_month_total":      this_month_total,
+        "this_month_completed":  this_month_completed,
+        # Not
+        "total_notes":           total_notes,
+        # Gelir
+        "session_fee":           fee,
+        "total_income":          total_income,
+        "this_month_income":     this_month_income,
+    }

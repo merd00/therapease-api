@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
 
+
 class User(Base):
     __tablename__ = "users"
 
@@ -11,15 +12,20 @@ class User(Base):
     email       = Column(String, unique=True, index=True, nullable=False)
     password    = Column(String, nullable=False)
     role        = Column(String, default="psikolog")
-    title       = Column(String, nullable=True)        # ← YENİ: Uzman Psikolog
-    clinic_name = Column(String, nullable=True)        # ← YENİ: Klinik adı
-    avatar_url  = Column(String, nullable=True)        # ← YENİ: Fotoğraf URL
+    title       = Column(String, nullable=True)
+    clinic_name = Column(String, nullable=True)
+    avatar_url  = Column(String, nullable=True)
+    bio              = Column(String, nullable=True)         
+    specializations  = Column(String, nullable=True)         
+    work_hours       = Column(String, nullable=True)          
+    session_fee      = Column(Integer, nullable=True) 
     created_at  = Column(DateTime, default=datetime.utcnow)
 
     patients     = relationship("Patient", back_populates="doctor")
     appointments = relationship("Appointment", back_populates="doctor")
+    notes        = relationship("Note", back_populates="doctor")  # ← YENİ
 
-# Patient, Appointment, Note modelleri aynı kalıyor...
+
 class Patient(Base):
     __tablename__ = "patients"
 
@@ -28,12 +34,14 @@ class Patient(Base):
     age        = Column(Integer)
     phone      = Column(String)
     status     = Column(String, default="Aktif")
+    tags       = Column(String, nullable=True)
     doctor_id  = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
 
     doctor       = relationship("User", back_populates="patients")
     appointments = relationship("Appointment", back_populates="patient")
     notes        = relationship("Note", back_populates="patient")
+
 
 class Appointment(Base):
     __tablename__ = "appointments"
@@ -50,12 +58,17 @@ class Appointment(Base):
     doctor  = relationship("User", back_populates="appointments")
     patient = relationship("Patient", back_populates="appointments")
 
+
 class Note(Base):
     __tablename__ = "notes"
 
     id         = Column(Integer, primary_key=True, index=True)
+    title      = Column(String, nullable=True) 
     content    = Column(Text, nullable=False)
+    session_number = Column(Integer, nullable=True)
     patient_id = Column(Integer, ForeignKey("patients.id"))
+    doctor_id  = Column(Integer, ForeignKey("users.id"))   # ← YENİ
     created_at = Column(DateTime, default=datetime.utcnow)
 
     patient = relationship("Patient", back_populates="notes")
+    doctor  = relationship("User", back_populates="notes")  # ← YENİ
